@@ -52,6 +52,12 @@ const router = createRouter({
       component: () => import('@/views/private/ImportView.vue'),
       meta: { requiresAuth: true }
     },
+    {
+      path: '/athleteData',
+      name: 'athleteData',
+      component: () => import('@/views/private/DataView.vue'),
+      meta: { requiresAuth: true }
+    },
 
     // 404
     {

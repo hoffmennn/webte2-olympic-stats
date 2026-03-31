@@ -1,5 +1,4 @@
 <?php
-// controllers/DetailController.php
 
 class DetailController
 {
@@ -10,33 +9,43 @@ class DetailController
         $this->pdo = $pdo;
     }
 
-    public function getAthleteDetail(int $id): ?array
-    {
-        // Nacitame osobne udaje sportovca - jeden zaznam
-        $athlete = $this->fetchAthlete($id);
 
-        // Ak sportovec s danym ID neexistuje, vratime null
-        // detail.php sa postara o presmerovanie alebo chybovu hlasku
-        if (!$athlete) {
-            return null;
+    public function getAthleteDetail(int $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Access-Control-Allow-Origin: http://localhost:5173');
+        header('Access-Control-Allow-Methods: GET');
+
+        // Validacia ID - musi byt kladne cislo
+        if ($id <= 0) {
+            $this->sendError('Neplatné ID', 400);
         }
 
-        // Nacitame vsetky jeho vysledky na OH - moze ich byt viac
+        $athlete = $this->fetchAthlete($id);
+
+
+        if (!$athlete) {
+            $this->sendError('Športovec nebol nájdený', 404);
+        }
+
         $results = $this->fetchResults($id);
 
-        // Vratime oddelene osobne udaje a vysledky
-        // View ich spracuje samostatne
-        return [
+        echo json_encode([
             'athlete' => $athlete,
             'results' => $results,
-        ];
+        ], JSON_UNESCAPED_UNICODE);
+
+        exit;
     }
 
-    // -------------------------
-    // Osobne udaje sportovca
-    // Pouzijeme LEFT JOIN pre krajiny - sportovec nemusi mat
-    // vyplnenu krajinu narodenia ani umrtia
-    // -------------------------
+    private function sendError(string $message, int $statusCode = 400): void
+    {
+        http_response_code($statusCode);
+        echo json_encode(['error' => $message], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // SQL
     private function fetchAthlete(int $id): ?array
     {
         $sql = "SELECT
@@ -50,7 +59,6 @@ class DetailController
                     bc.name AS birth_country,
                     dc.name AS death_country
                 FROM athletes a
-                -- LEFT JOIN pretoze krajina moze byt NULL
                 LEFT JOIN countries bc ON a.birth_country_id = bc.id
                 LEFT JOIN countries dc ON a.death_country_id = dc.id
                 WHERE a.id = :id
@@ -58,17 +66,10 @@ class DetailController
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([':id' => $id]);
-
-        // fetch() vracia jeden riadok alebo false ak nenajde
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }
 
-    // -------------------------
-    // Vsetky vysledky sportovca na OH
-    // Jeden sportovec moze mat viac vysledkov
-    // (rozne OH, rozne discipliny)
-    // -------------------------
     private function fetchResults(int $id): array
     {
         $sql = "SELECT
@@ -76,14 +77,13 @@ class DetailController
                     og.year,
                     og.type,
                     og.city,
-                    c.name  AS oh_country,
-                    d.name  AS discipline
+                    c.name AS oh_country,
+                    d.name AS discipline
                 FROM placements r
                 JOIN olympic_games og ON r.olympic_games_id = og.id
                 JOIN disciplines   d  ON r.discipline_id   = d.id
                 JOIN countries     c  ON og.country_id     = c.id
                 WHERE r.athlete_id = :id
-                -- Zoradime chronologicky od najnovsich
                 ORDER BY og.year DESC";
 
         $stmt = $this->pdo->prepare($sql);

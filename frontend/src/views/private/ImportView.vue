@@ -102,6 +102,9 @@ function cancelDelete() {
 </script>
 
 <template>
+
+
+
   <div class="import-page">
     <h1>Import a správa dát</h1>
 
@@ -150,9 +153,7 @@ function cancelDelete() {
       </button>
     </section>
 
-    <!-- ======================== -->
-    <!-- SEKCIA MAZANIE           -->
-    <!-- ======================== -->
+
     <section class="section danger-section">
       <h2>Vymazanie dát</h2>
       <p class="hint">

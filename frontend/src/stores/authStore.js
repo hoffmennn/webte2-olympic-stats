@@ -1,20 +1,19 @@
-// src/stores/authStore.js
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '@/services/api'
 
 export const useAuthStore = defineStore('auth', () => {
 
-  // STATE - základné reaktívne premenné
+  // STATE
   const token = ref(localStorage.getItem('token') || null)
   const user  = ref(JSON.parse(localStorage.getItem('user') || 'null'))
 
-  // COMPUTED - odvodené hodnoty
+  // COMPUTED
   const isLoggedIn = computed(() => !!token.value)
 
   // ACTIONS
 
-  // Zavolá login endpoint, uloží token a user do localStorage
+
   async function login(email, password, totp) {
     const response = await api.post('/auth/login.php', {
       email,
@@ -25,12 +24,11 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = response.data.token
     user.value  = response.data.user
 
-    // Uloženie do localStorage - prežije refresh stránky
+
     localStorage.setItem('token', token.value)
     localStorage.setItem('user', JSON.stringify(user.value))
   }
 
-  // Zavolá register endpoint
   async function register(firstName, lastName, email, password, passwordRepeat) {
     const response = await api.post('/auth/register.php', {
       first_name:      firstName,
@@ -39,11 +37,11 @@ export const useAuthStore = defineStore('auth', () => {
       password,
       password_repeat: passwordRepeat
     })
-    // Vrátime QR kód pre 2FA - Vue ho zobrazí používateľovi
+    // Vrátime QR kód
     return response.data
   }
 
-  // Vyčistí token a user - odhlásenie
+
   function logout() {
     token.value = null
     user.value  = null
@@ -52,7 +50,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Zavolá sa po Google OAuth2 callback
-  // Token príde z URL parametra
   function loginWithToken(jwtToken) {
     token.value = jwtToken
     localStorage.setItem('token', jwtToken)

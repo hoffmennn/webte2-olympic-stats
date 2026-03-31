@@ -1,12 +1,9 @@
 <?php
 
-
 class TableController
 {
     private PDO $pdo;
 
-    // Povolené stĺpce pre sortovanie - bezpečnostný zoznam
-    // Nikdy nedovoľ používateľovi poslať ľubovoľný názov stĺpca priamo do SQL
     private array $allowedSortColumns = [
         'surname' => 'a.last_name',
         'year' => 'og.year',
@@ -18,75 +15,73 @@ class TableController
         $this->pdo = $pdo;
     }
 
-    public function getTableData(): array
+    public function getTableData(): void
     {
-        // 1. Spracovanie vstupov
-        $filters = $this->resolveFilters();
-        $sort = $this->resolveSort();
+
+        header('Content-Type: application/json; charset=utf-8');
+        header('Access-Control-Allow-Origin: http://localhost:5173'); // Vite dev server port
+        header('Access-Control-Allow-Methods: GET');
+
+        $filters    = $this->resolveFilters();
+        $sort       = $this->resolveSort();
         $pagination = $this->resolvePagination();
 
-        // 2. Ziskanie dat
         $total = $this->countRows($filters);
-        $rows = $this->fetchRows($filters, $sort, $pagination);
+        $rows  = $this->fetchRows($filters, $sort, $pagination);
 
-        // 3. Vratenie vsetkych dat pre view
-        return [
-            'rows' => $rows,
-            'filters' => $filters,
-            'sort' => $sort,
+        // PHP list -> JSON
+        echo json_encode([
+            'rows'       => $rows,
+            'filters'    => $filters,
+            'sort'       => $sort,
             'pagination' => $this->buildPagination($pagination, $total),
-            'dropdowns' => $this->getDropdownOptions(),
-        ];
+            'dropdowns'  => $this->getDropdownOptions(),
+        ], JSON_UNESCAPED_UNICODE);
+
+        exit;
     }
 
-    // -------------------------
-    // VSTUP - filtre z GET
-    // -------------------------
 
+    private function sendError(string $message, int $statusCode = 400): void
+    {
+        http_response_code($statusCode);
+        echo json_encode([
+            'error' => $message
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // GET method
     private function resolveFilters(): array
     {
         return [
-            // filter_var pre integer, null ak nie je zadany
-            'year' => filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT) ?: null,
-            // htmlspecialchars pre string - ochrana pred XSS
+            'year'     => filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT) ?: null,
             'category' => isset($_GET['category']) ? htmlspecialchars(trim($_GET['category'])) : null,
+            'type'     => isset($_GET['type']) ? htmlspecialchars(trim($_GET['type'])) : null,
+            'placing'    => filter_input(INPUT_GET, 'placing', FILTER_VALIDATE_INT) ?: null,
         ];
     }
 
-    // -------------------------
-    // VSTUP - sortovanie z GET
-    // -------------------------
 
     private function resolveSort(): array
     {
         $col = $_GET['sort'] ?? null;
-        $dir = $_GET['dir'] ?? null;
+        $dir = $_GET['dir']  ?? null;
 
-        // Overenie ci stlpec je v bezpecnostnom zozname
-        // Ak nie je, pouzijeme default - ziadne sortovanie
-        $validCol = isset($this->allowedSortColumns[$col])
-            ? $col
-            : null;
+        $validCol = isset($this->allowedSortColumns[$col]) ? $col : null;
 
-        // Smer moze byt len ASC alebo DESC
         $validDir = $dir && in_array(strtoupper($dir), ['ASC', 'DESC'])
             ? strtoupper($dir)
             : null;
 
-        // Tretie kliknutie = reset (ked mame col ale dir je null)
         return [
             'column' => $validCol,
-            'dir' => $validDir,
+            'dir'    => $validDir,
         ];
     }
 
-    // -------------------------
-    // VSTUP - strankovanie z GET
-    // -------------------------
-
     private function resolvePagination(): array
     {
-        // Explicitna kontrola null - nesmieme pouzit ?: pretoze 0 je falsy
         $perPage = filter_input(INPUT_GET, 'per_page', FILTER_VALIDATE_INT);
         $perPage = $perPage === null ? 10 : (int)$perPage;
         $perPage = in_array($perPage, [10, 20, 50, 0]) ? $perPage : 10;
@@ -97,25 +92,21 @@ class TableController
         return [
             'page'    => $page,
             'perPage' => $perPage,
-            // Ak je perPage 0 (vsetky), offset nema zmysel - davame 0
             'offset'  => $perPage === 0 ? 0 : ($page - 1) * $perPage,
         ];
     }
 
-    // -------------------------
-    // SQL - pocet zaznamov (pre strankovanie)
-    // -------------------------
+    // SQL
 
     private function countRows(array $filters): int
     {
-        // Rovnake WHERE podmienky ako fetchRows, bez LIMIT/OFFSET/ORDER
         [$where, $params] = $this->buildWhere($filters);
 
         $sql = "SELECT COUNT(*) FROM placements r
-                JOIN athletes     a  ON r.athlete_id    = a.id
-                JOIN olympic_games og ON r.olympic_games_id     = og.id
-                JOIN disciplines  d  ON r.discipline_id = d.id
-                JOIN countries    c  ON og.country_id   = c.id
+                JOIN athletes      a  ON r.athlete_id       = a.id
+                JOIN olympic_games og ON r.olympic_games_id = og.id
+                JOIN disciplines   d  ON r.discipline_id    = d.id
+                JOIN countries     c  ON og.country_id      = c.id
                 $where";
 
         $stmt = $this->pdo->prepare($sql);
@@ -123,22 +114,16 @@ class TableController
         return (int)$stmt->fetchColumn();
     }
 
-    // -------------------------
-    // SQL - ziskanie riadkov
-    // -------------------------
-
     private function fetchRows(array $filters, array $sort, array $pagination): array
     {
         [$where, $params] = $this->buildWhere($filters);
 
-        // Sortovanie - bezpecne, pretoze pouzivame allowedSortColumns whitelist
-        $orderBy = 'ORDER BY og.year ASC';
+        $orderBy = 'ORDER BY og.year DESC';
         if ($sort['column'] && $sort['dir']) {
             $dbColumn = $this->allowedSortColumns[$sort['column']];
-            $orderBy = "ORDER BY $dbColumn {$sort['dir']}";
+            $orderBy  = "ORDER BY $dbColumn {$sort['dir']}";
         }
 
-        // Strankovanie - perPage=0 znamena vsetky zaznamy
         $limit = '';
         if ($pagination['perPage'] > 0) {
             $limit = "LIMIT {$pagination['perPage']} OFFSET {$pagination['offset']}";
@@ -150,13 +135,14 @@ class TableController
                     a.first_name,
                     a.last_name,
                     og.year,
-                    c.name  AS country,
-                    d.name  AS discipline
+                    og.type,
+                    c.name AS country,
+                    d.name AS discipline
                 FROM placements r
-                JOIN athletes      a  ON r.athlete_id    = a.id
-                JOIN olympic_games og ON r.olympic_games_id      = og.id
-                JOIN disciplines   d  ON r.discipline_id = d.id
-                JOIN countries     c  ON og.country_id   = c.id
+                JOIN athletes      a  ON r.athlete_id       = a.id
+                JOIN olympic_games og ON r.olympic_games_id = og.id
+                JOIN disciplines   d  ON r.discipline_id    = d.id
+                JOIN countries     c  ON og.country_id      = c.id
                 $where
                 $orderBy
                 $limit";
@@ -166,19 +152,24 @@ class TableController
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // -------------------------
-    // SQL - WHERE podmienky
-    // Oddelené aby sme neopakovali logiku v countRows aj fetchRows
-    // -------------------------
-
     private function buildWhere(array $filters): array
     {
         $conditions = [];
-        $params = [];
+        $params     = [];
 
         if ($filters['year']) {
             $conditions[] = "og.year = :year";
             $params[':year'] = $filters['year'];
+        }
+
+        if ($filters['placing']) {
+            $conditions[] = "r.placing = :placing";
+            $params[':placing'] = $filters['placing'];
+        }
+
+        if ($filters['type']) {
+            $conditions[] = "og.type = :type";
+            $params[':type'] = $filters['type'];
         }
 
         if ($filters['category']) {
@@ -190,44 +181,45 @@ class TableController
         return [$where, $params];
     }
 
-    // -------------------------
-    // Dropdown moznosti pre filtre
-    // -------------------------
-
     private function getDropdownOptions(): array
     {
         $years = $this->pdo
             ->query("SELECT DISTINCT year FROM olympic_games ORDER BY year DESC")
             ->fetchAll(PDO::FETCH_COLUMN);
 
+        $placing = $this->pdo
+            ->query("SELECT DISTINCT placing FROM placements ORDER BY placing ASC")
+            ->fetchAll(PDO::FETCH_COLUMN);
+
         $categories = $this->pdo
             ->query("SELECT DISTINCT name FROM disciplines ORDER BY name ASC")
             ->fetchAll(PDO::FETCH_COLUMN);
 
+        $year = $this->pdo
+            ->query("SELECT DISTINCT type FROM olympic_games ORDER BY type ASC")
+            ->fetchAll(PDO::FETCH_COLUMN);
+
         return [
-            'years' => $years,
+            'years'      => $years,
             'categories' => $categories,
+            'types'      => $year,
+            'placing'    => $placing,
         ];
     }
 
-    // -------------------------
-    // Strankovanie metadata pre view
-    // -------------------------
-
     private function buildPagination(array $pagination, int $total): array
     {
-        $perPage = $pagination['perPage'];
+        $perPage     = $pagination['perPage'];
         $currentPage = $pagination['page'];
-        $totalPages = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
+        $totalPages  = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
 
         return [
-            'current' => $currentPage,
-            'total' => $totalPages,
-            'perPage' => $perPage,
+            'current'   => $currentPage,
+            'total'     => $totalPages,
+            'perPage'   => $perPage,
             'totalRows' => $total,
-            // View pouzije toto na vygenerovanie odkazov stranok
-            'hasNext' => $currentPage < $totalPages,
-            'hasPrev' => $currentPage > 1,
+            'hasNext'   => $currentPage < $totalPages,
+            'hasPrev'   => $currentPage > 1,
         ];
     }
 }

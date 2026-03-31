@@ -33,8 +33,7 @@ async function fetchProfile() {
   try {
     loading.value = true
 
-    // Paralelné načítanie profilu aj histórie naraz
-    // Promise.all počká kým oba requesty dobehknú
+
     const [profileRes, historyRes] = await Promise.all([
       api.get('/user/profile.php'),
       api.get('/user/history.php')
@@ -43,7 +42,7 @@ async function fetchProfile() {
     user.value    = profileRes.data.user
     history.value = historyRes.data.history
 
-    // Predvyplnenie formulára hodnotami z DB
+
     firstName.value = user.value.first_name
     lastName.value  = user.value.last_name
 

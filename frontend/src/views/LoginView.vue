@@ -121,7 +121,7 @@ async function onSubmit() {
 
     <p>Nemáte konto? <RouterLink to="/register">Zaregistrujte sa</RouterLink></p>
     <p>
-      <a :href="`http://localhost:8080/auth/oauth2callback.php`">
+      <a href="https://node41.webte.fei.stuba.sk/auth/oauth2callback.php">
         Prihlásiť cez Google
       </a>
     </p>

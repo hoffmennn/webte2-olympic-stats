@@ -1,17 +1,16 @@
 {
-  "require": {
-    "phpoffice/phpspreadsheet": "^2.1",
-    "google/apiclient": "^2.15",
-    "sonata-project/google-authenticator": "^2.3"
-  },
-  "scripts": {
-    "post-autoload-dump": [
-      "Google\\Task\\ComposerInformation::cleanup"
-    ]
-  },
-  "extra": {
-    "google/apiclient-services": [
-      "oauth2"
-    ]
-  }
+    "require": {
+        "robthree/twofactorauth": "^3.0",
+        "bacon/bacon-qr-code": "^2",
+        "google/apiclient": "^2.19",
+        "firebase/php-jwt": "^7.0"
+    },
+    "scripts": {
+        "pre-autoload-dump": "Google\\Task\\Composer::cleanup"
+    },
+    "extra": {
+        "google/apiclient-services": [
+            "Oauth2"
+        ]
+    }
 }

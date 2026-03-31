@@ -14,9 +14,12 @@ services:
   php:
     build: ./php
     container_name: dev_php
+    environment:
+      - TZ=Europe/Bratislava
     volumes:
       - ./src:/var/www/html
-      - ./config.php:/var/www/config.php
+      - /etc/localtime:/etc/localtime:ro
+      - ./client_secret.json:/var/www/client_secret.json
 
   db:
     image: mariadb:11

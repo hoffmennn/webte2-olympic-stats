@@ -2,6 +2,7 @@
 import { RouterView, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import '@/assets/base.css'
+import CookieBanner from '@/components/CookieBanner.vue'
 
 const authStore = useAuthStore()
 const router    = useRouter()
@@ -14,10 +15,12 @@ function goToProfile() {
 <template>
   <div class="app-wrapper">
 
+    <CookieBanner/>
+
     <nav class="navbar">
       <div class="navbar-brand">
         <RouterLink to="/" class="logo-link">
-          <img src="../logo.png" alt="Logo" class="navbar-logo" />
+          <img src="../public/logo.png" alt="Logo" class="navbar-logo" />
           <span class="logo-text">Slovenský olympijský výbor</span>
         </RouterLink>
       </div>

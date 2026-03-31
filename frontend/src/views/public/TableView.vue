@@ -10,12 +10,14 @@ const router = useRouter()
 const rows       = ref([])
 const loading    = ref(true)
 const error      = ref(null)
-const dropdowns  = ref({ years: [], categories: [] })
+const dropdowns  = ref({ years: [], categories: [] , types: [], placing: []})
 const pagination = ref({ current: 1, total: 1, totalRows: 0, hasNext: false, hasPrev: false, perPage: 10 })
 
 
 const selectedYear     = ref('')
 const selectedCategory = ref('')
+const selectedType     = ref('')
+const selectedPlacing  = ref('')
 
 
 const sort = ref({ column: null, dir: null })
@@ -26,11 +28,12 @@ async function fetchAthletes(page = 1) {
   try {
     loading.value = true
 
-    // Zostavenie parametrov - posiela len tie ktoré sú nastavené
     const params = { page, per_page: pagination.value.perPage }
 
     if (selectedYear.value)     params.year     = selectedYear.value
     if (selectedCategory.value) params.category = selectedCategory.value
+    if (selectedType.value)     params.type     = selectedType.value
+    if (selectedPlacing.value)  params.placing  = selectedPlacing.value
     if (sort.value.column)      params.sort      = sort.value.column
     if (sort.value.dir)         params.dir       = sort.value.dir
 
@@ -56,6 +59,8 @@ function onFilterChange() {
 function resetFilters() {
   selectedYear.value     = ''
   selectedCategory.value = ''
+  selectedType.value     = ''
+  selectedPlacing.value     = ''
   sort.value             = { column: null, dir: null }
   fetchAthletes(1)
 }
@@ -77,9 +82,9 @@ function sortIcon(column) {
   return sort.value.dir === 'ASC' ? '↑' : '↓'
 }
 
-// -------------------------
+
 // STRÁNKOVANIE
-// -------------------------
+
 function goToPage(page) {
   fetchAthletes(page)
 }
@@ -88,9 +93,8 @@ function onPerPageChange() {
   fetchAthletes(1)
 }
 
-// -------------------------
 // DETAIL
-// -------------------------
+
 function goToDetail(id) {
   router.push({ name: 'athlete-detail', params: { id } })
 }
@@ -104,7 +108,6 @@ onMounted(() => fetchAthletes())
 
     <div class="table-wrapper">
 
-    <!-- FILTRE -->
     <div class="filters">
       <select v-model="selectedYear" @change="onFilterChange">
         <option value="">Všetky roky</option>
@@ -120,10 +123,23 @@ onMounted(() => fetchAthletes())
         </option>
       </select>
 
+      <select v-model="selectedType" @change="onFilterChange">
+        <option value="">Všetky Typy</option>
+        <option v-for="type in dropdowns.types" :key="type" :value="type">
+          {{ type }}
+        </option>
+      </select>
+
+      <select v-model="selectedPlacing" @change="onFilterChange">
+        <option value="">Všetky Umiestnenia</option>
+        <option v-for="placing in dropdowns.placing" :key="placing" :value="placing">
+          {{ placing }}
+        </option>
+      </select>
+
       <button @click="resetFilters">Zrušiť filtre</button>
     </div>
 
-    <!-- POČET NA STRÁNKU -->
     <div class="per-page">
       Zobraziť:
       <select v-model="pagination.perPage" @change="onPerPageChange">
@@ -152,6 +168,8 @@ onMounted(() => fetchAthletes())
             Rok {{ sortIcon('year') }}
           </th>
 
+          <th>Typ</th>
+
           <th>Krajina</th>
 
           <th v-if="!selectedCategory" @click="onSort('category')" style="cursor:pointer">
@@ -171,6 +189,7 @@ onMounted(() => fetchAthletes())
             </a>
           </td>
           <td v-if="!selectedYear">{{ row.year }}</td>
+          <td>{{ row.type }}</td>
           <td>{{ row.country }}</td>
           <td v-if="!selectedCategory">{{ row.discipline }}</td>
         </tr>

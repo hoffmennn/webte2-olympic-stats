@@ -1,2 +1,4 @@
 /src/vendor
-
+config.php
+client_secret.json
+/frontend/node_modules
