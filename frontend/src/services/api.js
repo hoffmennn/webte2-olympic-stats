@@ -3,15 +3,15 @@ import axios from 'axios'
 
 
 const api = axios.create({
-  //baseURL: 'https://node41.webte.fei.stuba.sk/olympic/'
-    baseURL: 'http://localhost:8080/',
+    baseURL: 'https://node41.webte.fei.stuba.sk/olympic2/',
+    //baseURL: 'http://localhost:8080/',
     headers: {
         'Content-Type': 'application/json'
     }
 })
 
 
-//JWT token do hlavičky ak existuje
+//JWT token
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token')
@@ -24,7 +24,6 @@ api.interceptors.request.use(
 )
 
 
-//  401  - token expiroval - odhlásiť používateľa
 api.interceptors.response.use(
   (response) => response,
   (error) => {

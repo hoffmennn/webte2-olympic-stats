@@ -34,7 +34,9 @@ function goToProfile() {
         </template>
 
         <template v-else>
-          <RouterLink to="/import">Správa dát</RouterLink>
+          <RouterLink to="/import">Import</RouterLink>
+
+          <RouterLink to="/athleteData">Správa dát</RouterLink>
 
           <button @click="goToProfile" class="btn-user">
             {{ authStore.user?.first_name }} {{ authStore.user?.last_name }}
@@ -56,6 +58,10 @@ function goToProfile() {
     <footer class="footer">
       <p>2026 WEBTE2</p>
       <p>Adam Hoffmann</p>
+
+      <button @click="$router.push('/docs')" class="btn-docs">
+        Dokumentácia API
+      </button>
     </footer>
 
   </div>
@@ -75,6 +81,7 @@ function goToProfile() {
   width: 100%;
   margin: 0 auto;
 }
+
 
 
 .navbar {
@@ -158,6 +165,21 @@ function goToProfile() {
   color: #ffffff !important;
 }
 
+.btn-docs{
+  border: 1px solid #ffffff;
+  margin: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-docs:hover{
+  background-color: var(--blue-primary-hover);
+  color: #ffffff;
+}
 
 .btn-user {
   background: none;
@@ -203,7 +225,6 @@ function goToProfile() {
   text-align: center;
   font-size: 0.85rem;
   color: #c0c0c0;
-  display: flex;
   justify-content: center;
   gap: 1.5rem;
 }

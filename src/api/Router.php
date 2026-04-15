@@ -4,19 +4,21 @@ class Router {
 
     private $routes = [];
 
-    public function add($method, $route, $handler)
+
+    public function add($method, $route, $handler, $middleware = [])
     {
         $this->routes[] = [
-            "method"=>$method,
-            "route"=>$route,
-            "handler"=>$handler
+            "method" => $method,
+            "route" => $route,
+            "handler" => $handler,
+            "middleware" => $middleware
         ];
     }
 
-    public function get($route,$handler){ $this->add("GET",$route,$handler); }
-    public function post($route,$handler){ $this->add("POST",$route,$handler); }
-    public function put($route,$handler){ $this->add("PUT",$route,$handler); }
-    public function delete($route,$handler){ $this->add("DELETE",$route,$handler); }
+    public function get($route, $handler, $middleware = []){ $this->add("GET", $route, $handler, $middleware); }
+    public function post($route, $handler, $middleware = []){ $this->add("POST", $route, $handler, $middleware); }
+    public function put($route, $handler, $middleware = []){ $this->add("PUT", $route, $handler, $middleware); }
+    public function delete($route, $handler, $middleware = []){ $this->add("DELETE", $route, $handler, $middleware); }
 
     public function run()
     {
@@ -34,16 +36,24 @@ class Router {
             $pattern = "#^".$pattern."$#";
 
             if (preg_match($pattern, $uri, $matches)) {
-
                 array_shift($matches);
 
-                [$class,$function] = $route["handler"];
+
+                if (!empty($route["middleware"])) {
+                    foreach ($route["middleware"] as $middleware) {
+                        call_user_func($middleware);
+                    }
+                }
+
+
+                [$class, $function] = $route["handler"];
+                require_once __DIR__ . "/controllers/" . $class . ".php";
                 $controller = new $class;
 
-                return call_user_func_array([$controller,$function],$matches);
+                return call_user_func_array([$controller, $function], $matches);
             }
         }
 
-        Response::json(["error"=>"Not Found"],404);
+        Response::json(["error" => "Not Found"], 404);
     }
 }

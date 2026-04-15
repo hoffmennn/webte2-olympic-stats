@@ -1,27 +1,55 @@
 <?php
 
-class TableController
+require_once __DIR__ . "/../../config.php";
+
+class PlacementController
 {
     private PDO $pdo;
 
     private array $allowedSortColumns = [
         'surname' => 'a.last_name',
         'year' => 'og.year',
-        'category' => 'd.name',
+        'discipline' => 'd.name',
     ];
 
-    public function __construct(PDO $pdo)
-    {
-        $this->pdo = $pdo;
+    public function __construct() {
+        $this->pdo = connectDatabase();
     }
 
-    public function getTableData(): void
+
+    //GET
+    public function getAthletePlacements($id)
     {
+        $athlete = $this->findById((int)$id);
+        if (!$athlete) {
+            Response::json(['error' => 'Athlete not found'], 404);
+        }
 
-        header('Content-Type: application/json; charset=utf-8');
-        header('Access-Control-Allow-Origin: http://localhost:5173'); // Vite dev server port
-        header('Access-Control-Allow-Methods: GET');
+        $stmt = $this->pdo->prepare( "SELECT
+                r.id AS placement_id,
+                r.placing,
+                r.olympic_games_id,
+                r.discipline_id,
+                og.year,
+                og.type,
+                og.city,
+                c.name AS oh_country,
+                d.name AS discipline
+            FROM placements r
+            JOIN olympic_games og ON r.olympic_games_id = og.id
+            JOIN disciplines   d  ON r.discipline_id   = d.id
+            JOIN countries     c  ON og.country_id     = c.id
+            WHERE r.athlete_id = :id
+            ORDER BY og.year DESC");
 
+        $stmt->execute([':id' => $id]);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        Response::json(['results' => $results], 200);
+    }
+
+    //GET all placements
+    public function index()
+    {
         $filters    = $this->resolveFilters();
         $sort       = $this->resolveSort();
         $pagination = $this->resolvePagination();
@@ -29,34 +57,115 @@ class TableController
         $total = $this->countRows($filters);
         $rows  = $this->fetchRows($filters, $sort, $pagination);
 
-        // PHP list -> JSON
-        echo json_encode([
+        Response::json([
             'rows'       => $rows,
             'filters'    => $filters,
             'sort'       => $sort,
             'pagination' => $this->buildPagination($pagination, $total),
             'dropdowns'  => $this->getDropdownOptions(),
-        ], JSON_UNESCAPED_UNICODE);
-
-        exit;
+        ]);
     }
 
+    // POST
+    public function create() {
+        $data = json_decode(file_get_contents('php://input'), true);
 
-    private function sendError(string $message, int $statusCode = 400): void
+        if (!$data) {
+            return Response::json(["error" => "Invalid JSON"], 400);
+        }
+
+        $stmt = $this->pdo->prepare("
+            INSERT INTO placements (athlete_id, olympic_games_id, discipline_id, placing)
+            VALUES (:athlete_id, :olympic_games_id, :discipline_id, :placing)
+        ");
+
+        $stmt->execute([
+            'athlete_id'       => $data['athlete_id'],
+            'olympic_games_id' => $data['olympic_games_id'],
+            'discipline_id'    => $data['discipline_id'],
+            'placing'          => $data['placing']
+        ]);
+
+        $id = $this->pdo->lastInsertId();
+        return Response::json(["id" => $id, "message" => "Created"], 201);
+    }
+
+    // DELETE
+    public function delete($id) {
+        $stmt = $this->pdo->prepare("DELETE FROM placements WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            return Response::json(["error" => "Not found"], 404);
+        }
+
+        return Response::json(null, 204);
+    }
+
+    public function update($id)
     {
-        http_response_code($statusCode);
-        echo json_encode([
-            'error' => $message
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        // 1. Načítanie a validácia JSON vstupu
+        $data = json_decode(file_get_contents('php://input'), true);
+        if (!$data) {
+            return Response::json(["error" => "Neplatné JSON dáta"], 400);
+        }
+
+        // 2. Kontrola, či záznam s týmto ID vôbec existuje
+        $stmt = $this->pdo->prepare("SELECT * FROM placements WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => (int)$id]);
+        $placement = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$placement) {
+            return Response::json(["error" => "Umiestnenie s ID $id nebolo nájdené"], 404);
+        }
+
+        // 3. Príprava hodnôt (ak kľúč v JSON chýba, použijeme pôvodnú hodnotu z DB)
+        // Použijeme null coalescing operátor ??
+        $athleteId  = $data['athlete_id']       ?? $placement['athlete_id'];
+        $gamesId    = $data['olympic_games_id'] ?? $placement['olympic_games_id'];
+        $disciplineId = $data['discipline_id']  ?? $placement['discipline_id'];
+        $placing    = $data['placing']          ?? $placement['placing'];
+
+        try {
+            // 4. Samotný UPDATE dotaz
+            $updateStmt = $this->pdo->prepare("
+                UPDATE placements 
+                SET 
+                    athlete_id = :athlete_id, 
+                    olympic_games_id = :olympic_games_id, 
+                    discipline_id = :discipline_id, 
+                    placing = :placing
+                WHERE id = :id
+            ");
+
+            $updateStmt->execute([
+                ':athlete_id'       => $athleteId,
+                ':olympic_games_id' => $gamesId,
+                ':discipline_id'    => $disciplineId,
+                ':placing'          => $placing,
+                ':id'               => (int)$id
+            ]);
+
+            return Response::json([
+                "message" => "Záznam úspešne aktualizovaný",
+                "id"      => (int)$id
+            ], 200);
+
+        } catch (PDOException $e) {
+            // Ošetrenie chýb (napr. ak ID atléta alebo hry neexistuje - Foreign Key Error)
+            return Response::json([
+                "error" => "Chyba pri aktualizácii: " . $e->getMessage()
+            ], 500);
+        }
     }
+
 
     // GET method
     private function resolveFilters(): array
     {
         return [
             'year'     => filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT) ?: null,
-            'category' => isset($_GET['category']) ? htmlspecialchars(trim($_GET['category'])) : null,
+            'discipline' => isset($_GET['discipline']) ? htmlspecialchars(trim($_GET['discipline'])) : null,
             'type'     => isset($_GET['type']) ? htmlspecialchars(trim($_GET['type'])) : null,
             'placing'    => filter_input(INPUT_GET, 'placing', FILTER_VALIDATE_INT) ?: null,
         ];
@@ -130,6 +239,7 @@ class TableController
         }
 
         $sql = "SELECT
+                    r.id as placement_id,
                     r.placing,
                     a.id,
                     a.first_name,
@@ -172,9 +282,9 @@ class TableController
             $params[':type'] = $filters['type'];
         }
 
-        if ($filters['category']) {
-            $conditions[] = "d.name = :category";
-            $params[':category'] = $filters['category'];
+        if ($filters['discipline']) {
+            $conditions[] = "d.name = :discipline";
+            $params[':discipline'] = $filters['discipline'];
         }
 
         $where = $conditions ? "WHERE " . implode(" AND ", $conditions) : "";
@@ -222,4 +332,23 @@ class TableController
             'hasPrev'   => $currentPage > 1,
         ];
     }
+
+    private function findById(int $id): ?array
+    {
+        $stmt = $this->pdo->prepare("
+        SELECT 
+        a.id
+        FROM athletes a
+        WHERE a.id = :id
+        ");
+
+        $stmt->execute([
+            'id' => $id
+        ]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+
 }
