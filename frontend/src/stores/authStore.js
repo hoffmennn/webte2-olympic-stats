@@ -15,7 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
 
 
   async function login(email, password, totp) {
-    const response = await api.post('/auth/login.php', {
+    const response = await api.post('api/auth/login', {
       email,
       password,
       totp
@@ -30,7 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function register(firstName, lastName, email, password, passwordRepeat) {
-    const response = await api.post('/auth/register.php', {
+    const response = await api.post('api/auth/register', {
       first_name:      firstName,
       last_name:       lastName,
       email,

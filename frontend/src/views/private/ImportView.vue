@@ -2,9 +2,7 @@
 import { ref } from 'vue'
 import api from '@/services/api'
 
-// -------------------------
-// STATE
-// -------------------------
+// ... STATE ostáva rovnaký ...
 const selectedFile   = ref(null)
 const importing      = ref(false)
 const deleting       = ref(false)
@@ -28,13 +26,11 @@ function validateFile() {
     importError.value = 'Vyberte CSV súbor'
     return false
   }
-
   const ext = selectedFile.value.name.split('.').pop().toLowerCase()
   if (ext !== 'csv') {
     importError.value = 'Povolené sú iba CSV súbory'
     return false
   }
-
   return true
 }
 
@@ -42,27 +38,22 @@ async function onImport() {
   if (!validateFile()) return
 
   try {
-    importing.value     = true
-    importResult.value  = null
-    importError.value   = null
-
-    // Súbor sa posiela ako FormData - nie JSON
-    // Backend číta $_FILES['csv_file']
+    importing.value = true
     const formData = new FormData()
+
+
     formData.append('csv_file', selectedFile.value)
 
-    const response = await api.post('/import.php', formData, {
+    const response = await api.post('api/import', formData, {
       headers: {
-        // Prepiseme Content-Type - axios ho nastaví správne pre FormData
-        // vrátane boundary parametra
-        'Content-Type': 'multipart/form-data'
+        'Content-Type': undefined
       }
     })
 
     importResult.value = response.data
-
   } catch (e) {
-    importError.value = e.response?.data?.error ?? 'Nastala neočakávaná chyba'
+    console.error("Chyba pri importe:", e.response?.data)
+    importError.value = e.response?.data?.error ?? 'Súbor sa nepodarilo odoslať'
   } finally {
     importing.value = false
   }
@@ -72,7 +63,6 @@ async function onImport() {
 // MAZANIE DÁT
 // -------------------------
 async function onDelete() {
-  // Dvojité potvrdenie - používateľ musí kliknúť dvakrát
   if (!deleteConfirm.value) {
     deleteConfirm.value = true
     return
@@ -83,13 +73,15 @@ async function onDelete() {
     deleteSuccess.value = null
     deleteError.value   = null
 
-    await api.delete('/import.php')
+    // ZMENA: Voláme '/import' s metódou DELETE namiesto '/import.php'
+    await api.delete('api/import')
 
-    deleteSuccess.value = 'Všetky dáta boli vymazané'
+    deleteSuccess.value = 'Všetky dáta boli úspešne vymazané z databázy'
     deleteConfirm.value = false
+    importResult.value  = null // Vyčistíme aj predošlé výsledky importu
 
   } catch (e) {
-    deleteError.value = e.response?.data?.error ?? 'Nastala neočakávaná chyba'
+    deleteError.value = e.response?.data?.error ?? 'Dáta sa nepodarilo vymazať'
     deleteConfirm.value = false
   } finally {
     deleting.value = false

@@ -14,21 +14,25 @@ const error   = ref(null)
 async function fetchAthleteDetail() {
   try {
     loading.value = true
+    const id = route.params.id // Získame ID z URL
 
-    // ID berie z URL - /athletes/42 → route.params.id = 42
-    const response = await api.get('api/detail.php', {
-      params: { id: route.params.id }
-    })
+    // Spustíme obe požiadavky paralelne
+    const [athleteRes, placementsRes] = await Promise.all([
+      api.get(`api/athletes/${id}`),
+      api.get(`api/placements/${id}`)
+    ])
 
-    athlete.value = response.data.athlete
-    results.value = response.data.results
+    // Priradíme dáta (predpokladám, že tvoj Controller ich vracia pod kľúčmi 'athlete' a 'results')
+    athlete.value = athleteRes.data.athlete
+    results.value = placementsRes.data.results
 
   } catch (e) {
-    // 404 - športovec neexistuje
+    console.error(e)
+    // 404 - ak neexistuje športovec (prvá požiadavka zlyhala)
     if (e.response?.status === 404) {
       error.value = 'Športovec nebol nájdený'
     } else {
-      error.value = 'Nepodarilo sa načítať dáta'
+      error.value = 'Nepodarilo sa načítať detaily športovca'
     }
   } finally {
     loading.value = false

@@ -28,28 +28,36 @@ async function fetchAthletes(page = 1) {
   try {
     loading.value = true
 
-    const params = { page, per_page: pagination.value.perPage }
+    // Pripravíme parametre tak, ako ich očakáva tvoj nový PlacementController::index
+    const params = {
+      page,
+      per_page: pagination.value.perPage
+    }
 
+    // Mapovanie filtrov z Vue state na query parametre
     if (selectedYear.value)     params.year     = selectedYear.value
-    if (selectedCategory.value) params.category = selectedCategory.value
+    if (selectedCategory.value) params.discipline = selectedCategory.value
     if (selectedType.value)     params.type     = selectedType.value
     if (selectedPlacing.value)  params.placing  = selectedPlacing.value
-    if (sort.value.column)      params.sort      = sort.value.column
-    if (sort.value.dir)         params.dir       = sort.value.dir
+    if (sort.value.column)      params.sort     = sort.value.column
+    if (sort.value.dir)         params.dir      = sort.value.dir
 
-    const response = await api.get('api/athletes.php', { params })
+    // ZMENA TU: Namiesto 'api/athletes.php' voláme REST cestu '/api/placements'
+    // Poznámka: Predpokladám, že tvoj axios baseURL končí na /api/ alebo máš prepis v .htaccess
+    const response = await api.get('api/placements', { params })
 
+    // Priradenie dát zostáva rovnaké, ak Controller vracia rovnakú štruktúru
     rows.value       = response.data.rows
     pagination.value = response.data.pagination
     dropdowns.value  = response.data.dropdowns
 
   } catch (e) {
-    error.value = 'Nepodarilo sa načítať dáta'
+    console.error(e)
+    error.value = 'Nepodarilo sa načítať dáta zo servera'
   } finally {
     loading.value = false
   }
 }
-
 
 // FILTRE
 function onFilterChange() {
@@ -97,6 +105,15 @@ function onPerPageChange() {
 
 function goToDetail(id) {
   router.push({ name: 'athlete-detail', params: { id } })
+}
+
+async function deletePlacement(id) {
+  try {
+    await api.delete(`api/placements/${id}`)
+    fetchAthletes(pagination.value.current)
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 onMounted(() => fetchAthletes())
@@ -175,6 +192,9 @@ onMounted(() => fetchAthletes())
           <th v-if="!selectedCategory" @click="onSort('category')" style="cursor:pointer">
             Šport {{ sortIcon('category') }}
           </th>
+
+
+
         </tr>
         </thead>
         <tbody>
@@ -192,6 +212,7 @@ onMounted(() => fetchAthletes())
           <td>{{ row.type }}</td>
           <td>{{ row.country }}</td>
           <td v-if="!selectedCategory">{{ row.discipline }}</td>
+
         </tr>
         </tbody>
       </table>
@@ -430,6 +451,21 @@ tbody tr td[colspan] {
 .pagination button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+tbody td button {
+  background: none;
+  border: none;
+  color: #c0392b;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+}
+
+tbody td button:hover {
+  background-color: #fdecea;
 }
 
 /* -------------------------

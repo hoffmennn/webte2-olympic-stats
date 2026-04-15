@@ -11,10 +11,9 @@ const history = ref([])
 const loading = ref(true)
 const error   = ref(null)
 
-
-const firstName     = ref('')
-const lastName      = ref('')
-const profileErrors = ref([])
+const firstName      = ref('')
+const lastName       = ref('')
+const profileErrors  = ref([])
 const profileSuccess = ref(null)
 const profileLoading = ref(false)
 
@@ -27,32 +26,33 @@ const passwordSuccess = ref(null)
 const passwordLoading = ref(false)
 
 // -------------------------
-// NAČÍTANIE DÁT
+// 1. NAČÍTANIE DÁT (GET)
 // -------------------------
 async function fetchProfile() {
   try {
     loading.value = true
+    error.value = null
 
-
+    // Paralelné volanie nových endpointov
     const [profileRes, historyRes] = await Promise.all([
-      api.get('/user/profile.php'),
-      api.get('/user/history.php')
+      api.get('api/users/me'),        // Pôvodne profile.php
+      api.get('api/users/me/logins')  // Pôvodne history.php
     ])
 
     user.value    = profileRes.data.user
     history.value = historyRes.data.history
 
-
+    // Predvyplnenie inputov pre editáciu
     firstName.value = user.value.first_name
     lastName.value  = user.value.last_name
 
   } catch (e) {
-    error.value = 'Nepodarilo sa načítať profil'
+    console.error(e)
+    error.value = 'Nepodarilo sa načítať profil. Skontrolujte pripojenie.'
   } finally {
     loading.value = false
   }
 }
-
 // -------------------------
 // ZMENA PROFILU
 // -------------------------
@@ -80,31 +80,34 @@ async function onProfileSubmit() {
   try {
     profileLoading.value = true
     profileSuccess.value = null
+    profileErrors.value  = []
 
-    await api.put('/user/profile.php', {
+    // Voláme PUT /users/me
+    await api.put('api/users/me', {
       first_name: firstName.value,
       last_name:  lastName.value
     })
 
-    // Aktualizuj lokálny user objekt
+    // Aktualizácia lokálneho stavu a Pinia storu (aby sa meno zmenilo aj v Menu/Headeri)
     user.value.first_name = firstName.value
     user.value.last_name  = lastName.value
-    authStore.user.first_name = firstName.value
-    authStore.user.last_name  = lastName.value
 
-    profileSuccess.value  = 'Profil bol úspešne aktualizovaný'
+    if (authStore.user) {
+      authStore.user.first_name = firstName.value
+      authStore.user.last_name  = lastName.value
+      // Nezabudni aktualizovať localStorage, ak to tvoj store nerobí automaticky cez watch
+      localStorage.setItem('user', JSON.stringify(authStore.user))
+    }
+
+    profileSuccess.value = 'Profil bol úspešne aktualizovaný'
 
   } catch (e) {
-    if (e.response?.data?.errors) {
-      profileErrors.value = e.response.data.errors
-    } else {
-      profileErrors.value = ['Nastala neočakávaná chyba']
-    }
+    const data = e.response?.data
+    profileErrors.value = data?.errors || [data?.error || 'Nastala neočakávaná chyba']
   } finally {
     profileLoading.value = false
   }
 }
-
 // -------------------------
 // ZMENA HESLA
 // -------------------------
@@ -138,27 +141,24 @@ async function onPasswordSubmit() {
   try {
     passwordLoading.value = true
     passwordSuccess.value = null
+    passwordErrors.value  = []
 
-    await api.put('/user/password.php', {
+    // Voláme PUT /users/me/password
+    await api.put('api/users/me/password', {
       current_password: currentPassword.value,
       new_password:     newPassword.value,
       repeat_password:  repeatPassword.value
     })
 
-    // Vyčisti formulár po úspešnej zmene
+    // Reset formulára
     currentPassword.value = ''
     newPassword.value     = ''
     repeatPassword.value  = ''
     passwordSuccess.value = 'Heslo bolo úspešne zmenené'
 
   } catch (e) {
-    if (e.response?.data?.errors) {
-      passwordErrors.value = e.response.data.errors
-    } else if (e.response?.data?.error) {
-      passwordErrors.value = [e.response.data.error]
-    } else {
-      passwordErrors.value = ['Nastala neočakávaná chyba']
-    }
+    const data = e.response?.data
+    passwordErrors.value = data?.errors || [data?.error || 'Nepodarilo sa zmeniť heslo']
   } finally {
     passwordLoading.value = false
   }

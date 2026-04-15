@@ -55,9 +55,15 @@ const router = createRouter({
     {
       path: '/athleteData',
       name: 'athleteData',
-      component: () => import('@/views/private/DataView.vue'),
+      component: () => import('@/views/private/AthleteEditView.vue'),
       meta: { requiresAuth: true }
     },
+    {
+      path: '/docs',
+      name: 'docs',
+      component: () => import('@/views/public/DocsView.vue'),
+    },
+
 
     // 404
     {
